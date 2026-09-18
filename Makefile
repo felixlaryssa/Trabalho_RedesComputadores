@@ -15,3 +15,4 @@ clean:
 
 run:
 	./$(TARGET) unb.br 8.8.8.8
+	
