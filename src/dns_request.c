@@ -1,9 +1,32 @@
 #include "dns_request.h"
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <sys/random.h>
+
+
+static uint16_t generate_transaction_id(void)
+{
+    uint16_t id;
+
+    ssize_t result;
+
+    do {
+        result = getrandom(
+            &id,
+            sizeof(id),
+            0
+        );
+    } while (result < 0 && errno == EINTR);
+
+    if (result != sizeof(id)) {
+        id = (uint16_t)rand();
+    }
+
+    return id;
+}
 
 
 int encode_domain_name(
@@ -16,6 +39,7 @@ int encode_domain_name(
     }
 
     int buffer_pos = 0;
+
     const char *label_start = domain;
     const char *current = domain;
 
@@ -23,19 +47,30 @@ int encode_domain_name(
 
         if (*current == '.' || *current == '\0') {
 
-            int label_length = current - label_start;
+            int label_length =
+                (int)(current - label_start);
 
             /*
-             * Uma label DNS pode possuir no máximo 63 caracteres.
+             * Cada label DNS pode ter no máximo
+             * 63 caracteres.
              */
-            if (label_length <= 0 || label_length > 63) {
+            if (
+                label_length <= 0 ||
+                label_length > 63
+            ) {
                 return -1;
             }
 
-            buffer[buffer_pos++] = (unsigned char)label_length;
+            buffer[buffer_pos++] =
+                (unsigned char)label_length;
 
-            for (int i = 0; i < label_length; i++) {
-                buffer[buffer_pos++] = label_start[i];
+            for (
+                int i = 0;
+                i < label_length;
+                i++
+            ) {
+                buffer[buffer_pos++] =
+                    (unsigned char)label_start[i];
             }
 
             if (*current == '\0') {
@@ -49,7 +84,7 @@ int encode_domain_name(
     }
 
     /*
-     * Zero indica o final do nome DNS.
+     * Zero marca o final do nome DNS.
      */
     buffer[buffer_pos++] = 0;
 
@@ -73,57 +108,51 @@ int build_dns_query(
         return -1;
     }
 
-    memset(buffer, 0, buffer_size);
+    memset(
+        buffer,
+        0,
+        (size_t)buffer_size
+    );
 
     /*
-     * Geração de um Transaction ID de 16 bits.
+     * Transaction ID aleatório de 16 bits.
      */
-    static int initialized = 0;
-
-    if (!initialized) {
-        srand((unsigned int)time(NULL));
-        initialized = 1;
-    }
-
-    *transaction_id = (uint16_t)(rand() & 0xFFFF);
+    *transaction_id =
+        generate_transaction_id();
 
     dns_header_t header;
 
-    header.id = htons(*transaction_id);
+    header.id =
+        htons(*transaction_id);
 
-    /*
-     * 0x0100:
-     * consulta padrão com Recursion Desired (RD = 1).
-     */
-    header.flags = htons(0x0100);
+    header.flags =
+        htons(0x0100);
 
-    /*
-     * Apenas uma pergunta.
-     */
-    header.qdcount = htons(1);
+    header.qdcount =
+        htons(1);
 
-    header.ancount = htons(0);
-    header.nscount = htons(0);
-    header.arcount = htons(0);
+    header.ancount =
+        htons(0);
 
-    /*
-     * Copia os 12 bytes do cabeçalho para o pacote.
-     */
+    header.nscount =
+        htons(0);
+
+    header.arcount =
+        htons(0);
+
     memcpy(
         buffer,
         &header,
-        sizeof(dns_header_t)
+        sizeof(header)
     );
 
     int offset = DNS_HEADER_SIZE;
 
-    /*
-     * Codifica o domínio.
-     */
-    int domain_size = encode_domain_name(
-        domain,
-        buffer + offset
-    );
+    int domain_size =
+        encode_domain_name(
+            domain,
+            buffer + offset
+        );
 
     if (domain_size < 0) {
         return -1;
@@ -131,20 +160,15 @@ int build_dns_query(
 
     offset += domain_size;
 
-    /*
-     * Precisamos de mais quatro bytes:
-     *
-     * 2 bytes - QTYPE
-     * 2 bytes - QCLASS
-     */
     if (offset + 4 > buffer_size) {
         return -1;
     }
 
     /*
-     * QTYPE = 15 = MX
+     * QTYPE = MX.
      */
-    uint16_t qtype = htons(DNS_TYPE_MX);
+    uint16_t qtype =
+        htons(DNS_TYPE_MX);
 
     memcpy(
         buffer + offset,
@@ -155,9 +179,10 @@ int build_dns_query(
     offset += sizeof(qtype);
 
     /*
-     * QCLASS = 1 = IN
+     * QCLASS = IN.
      */
-    uint16_t qclass = htons(DNS_CLASS_IN);
+    uint16_t qclass =
+        htons(DNS_CLASS_IN);
 
     memcpy(
         buffer + offset,
