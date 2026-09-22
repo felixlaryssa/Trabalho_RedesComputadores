@@ -1,0 +1,4 @@
+# Ignorar arquivos objetos e o executável final
+*.o
+src/*.o
+meu_cliente
