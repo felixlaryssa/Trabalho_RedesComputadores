@@ -1,18 +1,22 @@
-CC = gcc
+CC := gcc
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Werror
+CPPFLAGS := -Isrc
+BUILD_DIR := build
+TEST_BIN := $(BUILD_DIR)/test_udp_client
 
-CFLAGS = -Wall -Wextra -Wpedantic -std=c11
+.PHONY: all test clean
 
-TARGET = meu_cliente
+all: test
 
-SRC = src/main.c \
-      src/dns_request.c
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-all:
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
+$(TEST_BIN): src/udp_client.c tests/test_udp_client.c | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
+
+test: $(TEST_BIN)
+	./$(TEST_BIN)
 
 clean:
-	rm -f $(TARGET)
-
-run:
-	./$(TARGET) unb.br 8.8.8.8
-	
+	rm -f $(TEST_BIN)
+	rmdir $(BUILD_DIR) 2>/dev/null || true
