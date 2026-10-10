@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "dns_request.h"
 
@@ -8,6 +8,12 @@
 
 int main(int argc, char *argv[])
 {
+    /*
+     * O programa exige:
+     *
+     * argv[1] = domínio
+     * argv[2] = endereço do servidor DNS
+     */
     if (argc != 3) {
 
         fprintf(
@@ -19,19 +25,32 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const char *domain = argv[1];
-    const char *dns_server = argv[2];
+    const char *domain =
+        argv[1];
 
-    unsigned char packet[BUFFER_SIZE];
+    const char *dns_server =
+        argv[2];
+
+    /*
+     * Buffer onde a consulta DNS
+     * será construída.
+     */
+    unsigned char packet[
+        BUFFER_SIZE
+    ];
 
     uint16_t transaction_id;
 
-    int packet_size = build_dns_query(
-        domain,
-        packet,
-        BUFFER_SIZE,
-        &transaction_id
-    );
+    /*
+     * Monta a consulta DNS MX.
+     */
+    int packet_size =
+        build_dns_query(
+            domain,
+            packet,
+            BUFFER_SIZE,
+            &transaction_id
+        );
 
     if (packet_size < 0) {
 
@@ -67,23 +86,40 @@ int main(int argc, char *argv[])
         packet_size
     );
 
+    /*
+     * Exibe o pacote DNS em hexadecimal.
+     *
+     * Serve para conferir:
+     *
+     * - Transaction ID
+     * - Flags
+     * - QDCOUNT
+     * - domínio
+     * - QTYPE MX
+     * - QCLASS IN
+     */
     printf(
         "\nPacote DNS:\n"
     );
 
-    for (int i = 0; i < packet_size; i++) {
-
+    for (
+        int i = 0;
+        i < packet_size;
+        ++i
+    ) {
         printf(
             "%02X ",
             packet[i]
         );
 
-        if ((i + 1) % 16 == 0) {
-            printf("\n");
+        if (
+            (i + 1) % 16 == 0
+        ) {
+            putchar('\n');
         }
     }
 
-    printf("\n");
+    putchar('\n');
 
     return 0;
 }
