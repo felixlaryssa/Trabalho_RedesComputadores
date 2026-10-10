@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "../dns_response.h"
+#include "../src/dns_response.h"
 
 static int fails = 0;
 #define CHECK(c) do { if (!(c)) { printf("FALHOU: %s (linha %d)\n", #c, __LINE__); fails++; } } while (0)
