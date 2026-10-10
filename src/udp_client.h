@@ -7,6 +7,8 @@
 #include <sys/types.h>
 
 #define DNS_PORT 53
+#define DNS_TIMEOUT_SECONDS 2
+#define DNS_MAX_ATTEMPTS 3
 
 /**
  * Cria um socket IPv4 do tipo UDP.
@@ -77,5 +79,31 @@ ssize_t udp_client_receive_response(int socket_fd,
                                     uint8_t *response_buffer,
                                     size_t response_capacity,
                                     struct sockaddr_in *sender_address);
+/**
+ * Configura o socket para aguardar no máximo 2 segundos
+ * pela resposta do servidor.
+ */
+int udp_client_set_receive_timeout(int socket_fd);
 
+/**
+ * Envia a consulta e espera a resposta.
+ *
+ * Em caso de timeout, repete o envio até completar
+ * no máximo 3 tentativas.
+ *
+ * Retorna:
+ *   > 0: quantidade de bytes recebidos;
+ *    -1: erro na comunicação.
+ *
+ * Após três timeouts, errno será ETIMEDOUT.
+ */
+ssize_t udp_client_exchange_with_retry(
+    int socket_fd,
+    const uint8_t *query,
+    size_t query_size,
+    const struct sockaddr_in *server_address,
+    uint8_t *response_buffer,
+    size_t response_capacity,
+    struct sockaddr_in *sender_address,
+    unsigned int *attempts_made);
 #endif

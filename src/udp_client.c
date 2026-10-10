@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 int udp_client_open(void)
 {
@@ -109,4 +110,93 @@ ssize_t udp_client_receive_response(int socket_fd,
                     0,
                     sender,
                     sender_size_pointer);
+}
+
+int udp_client_set_receive_timeout(int socket_fd)
+{
+    if (socket_fd < 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    const struct timeval timeout = {
+        .tv_sec = DNS_TIMEOUT_SECONDS,
+        .tv_usec = 0,
+    };
+
+    return setsockopt(socket_fd,
+                      SOL_SOCKET,
+                      SO_RCVTIMEO,
+                      &timeout,
+                      sizeof(timeout));
+}
+
+ssize_t udp_client_exchange_with_retry(
+    int socket_fd,
+    const uint8_t *query,
+    size_t query_size,
+    const struct sockaddr_in *server_address,
+    uint8_t *response_buffer,
+    size_t response_capacity,
+    struct sockaddr_in *sender_address,
+    unsigned int *attempts_made)
+{
+    if (attempts_made != NULL) {
+        *attempts_made = 0;
+    }
+
+    if (socket_fd < 0 ||
+        query == NULL ||
+        query_size == 0 ||
+        server_address == NULL ||
+        response_buffer == NULL ||
+        response_capacity == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    if (udp_client_set_receive_timeout(socket_fd) == -1) {
+        return -1;
+    }
+
+    for (unsigned int attempt = 1;
+         attempt <= DNS_MAX_ATTEMPTS;
+         ++attempt) {
+
+        if (attempts_made != NULL) {
+            *attempts_made = attempt;
+        }
+
+        if (udp_client_send_query(socket_fd,
+                                  query,
+                                  query_size,
+                                  server_address) == -1) {
+            return -1;
+        }
+
+        ssize_t bytes_received;
+
+        do {
+            bytes_received = udp_client_receive_response(
+                socket_fd,
+                response_buffer,
+                response_capacity,
+                sender_address);
+        } while (bytes_received == -1 && errno == EINTR);
+
+        if (bytes_received >= 0) {
+            return bytes_received;
+        }
+
+        /*
+         * EAGAIN e EWOULDBLOCK indicam que o tempo
+         * de espera terminou sem resposta.
+         */
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+            return -1;
+        }
+    }
+
+    errno = ETIMEDOUT;
+    return -1;
 }
