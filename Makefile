@@ -1,18 +1,22 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -Wpedantic
+CC := gcc
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Werror
+CPPFLAGS := -Isrc
+BUILD_DIR := build
+TEST_BIN := $(BUILD_DIR)/test_udp_client
 
-SRC_DIR = src
-SOURCES = $(wildcard $(SRC_DIR)/*.c)
-OBJECTS = $(SOURCES:.c=.o)
-TARGET = meu_cliente
+.PHONY: all test clean
 
-all: $(TARGET)
+all: test
 
-$(TARGET): $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $^
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+$(TEST_BIN): src/udp_client.c tests/test_udp_client.c | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $^ -o $@
+
+test: $(TEST_BIN)
+	./$(TEST_BIN)
 
 clean:
-	rm -f $(SRC_DIR)/*.o $(TARGET)
+	rm -f $(TEST_BIN)
+	rmdir $(BUILD_DIR) 2>/dev/null || true
